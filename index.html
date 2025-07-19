@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Connect Memory Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            min-height: 100vh;
+        }
+        
+        .card {
+            perspective: 1000px;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+        }
+        
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+        
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .card-front {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card-back {
+            background: white;
+            transform: rotateY(180deg);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .emoji {
+            font-size: 2.5rem;
+        }
+        
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            opacity: 0;
+            animation: confetti-fall 3s ease-in-out forwards;
+        }
+        
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(-100vh) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+        
+        .question-card {
+            transform: translateY(20px);
+            opacity: 0;
+            transition: all 0.5s ease;
+        }
+        
+        .question-card.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+        
+        .progress-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #10b981;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-5xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-white mb-2">Team Connect</h1>
+            <p class="text-indigo-100 text-lg">Match the emoji pairs and spark conversations!</p>
+        </div>
+        
+        <!-- Game Stats -->
+        <div class="flex flex-wrap justify-between items-center mb-6 text-white">
+            <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                <div>
+                    <span class="font-medium">Moves:</span>
+                    <span id="moves" class="ml-1">0</span>
+                </div>
+                <div>
+                    <span class="font-medium">Matches:</span>
+                    <span id="matches" class="ml-1">0/6</span>
+                </div>
+            </div>
+            <div class="flex space-x-4">
+                <button id="reset-btn" class="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium hover:bg-indigo-50 transition-colors">
+                    Reset Game
+                </button>
+                <button id="new-question-btn" class="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium hover:bg-indigo-50 transition-colors">
+                    New Question
+                </button>
+            </div>
+        </div>
+        
+        <!-- Progress Bar -->
+        <div class="progress-bar mb-6">
+            <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+        </div>
+        
+        <!-- Game Board -->
+        <div id="game-board" class="grid grid-cols-3 md:grid-cols-4 gap-4 mb-8"></div>
+        
+        <!-- Question Card -->
+        <div id="question-card" class="question-card bg-white rounded-xl p-6 shadow-lg">
+            <h3 class="text-xl font-semibold text-indigo-800 mb-3">Ice Breaker Question:</h3>
+            <p id="question-text" class="text-gray-700 text-lg mb-4">What emoji best describes your morning today?</p>
+            <div class="flex justify-end">
+                <button id="next-question" class="btn-primary text-white px-4 py-2 rounded-lg font-medium">
+                    Next Question
+                </button>
+            </div>
+        </div>
+        
+        <!-- Game Complete Modal -->
+        <div id="complete-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
+            <div class="bg-white rounded-xl p-8 max-w-md w-full mx-4 transform transition-all">
+                <div class="text-center">
+                    <div class="text-5xl mb-4">🎉</div>
+                    <h2 class="text-2xl font-bold text-indigo-800 mb-2">Great Job!</h2>
+                    <p class="text-gray-600 mb-6">You've matched all the pairs in <span id="final-moves">0</span> moves!</p>
+                    <div class="flex justify-center">
+                        <button id="play-again" class="btn-primary text-white px-6 py-3 rounded-lg font-medium">
+                            Play Again
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Game variables
+            let cards = [];
+            let flippedCards = [];
+            let matchedPairs = 0;
+            let moves = 0;
+            let canFlip = true;
+            
+            // Emojis for the game
+            const emojis = ['🚀', '🌟', '🎯', '🧩', '💡', '🔍'];
+            
+            // Ice breaker questions
+            const questions = [
+                "What emoji best describes your morning today?",
+                "Share one small win you had this week.",
+                "What's a work skill you're proud of developing?",
+                "If your work style was a movie genre, what would it be?",
+                "What's one thing you'd like to learn from someone on the team?",
+                "What's your favorite way to recharge after a busy workday?",
+                "If you could add one thing to our workspace, what would it be?",
+                "What's a tool or app that makes your work life easier?",
+                "Share a work-related goal you have for the next month.",
+                "What's something your teammates might not know about you?"
+            ];
+            
+            // Initialize the game
+            function initGame() {
+                const gameBoard = document.getElementById('game-board');
+                gameBoard.innerHTML = '';
+                
+                // Reset game state
+                cards = [];
+                flippedCards = [];
+                matchedPairs = 0;
+                moves = 0;
+                canFlip = true;
+                
+                // Update UI
+                document.getElementById('moves').textContent = '0';
+                document.getElementById('matches').textContent = '0/6';
+                document.getElementById('progress-fill').style.width = '0%';
+                
+                // Create card pairs
+                const cardPairs = [...emojis, ...emojis];
+                
+                // Shuffle cards
+                const shuffledCards = cardPairs.sort(() => Math.random() - 0.5);
+                
+                // Create card elements
+                shuffledCards.forEach((emoji, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'card aspect-square';
+                    card.dataset.cardIndex = index;
+                    card.dataset.emoji = emoji;
+                    
+                    card.innerHTML = `
+                        <div class="card-inner w-full h-full">
+                            <div class="card-front">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div class="card-back">
+                                <span class="emoji">${emoji}</span>
+                            </div>
+                        </div>
+                    `;
+                    
+                    card.addEventListener('click', () => flipCard(card));
+                    gameBoard.appendChild(card);
+                    cards.push(card);
+                });
+                
+                // Show a random question
+                showRandomQuestion();
+            }
+            
+            // Flip card function
+            function flipCard(card) {
+                // Prevent flipping if game is locked or card is already flipped/matched
+                if (!canFlip || card.classList.contains('flipped') || flippedCards.length >= 2) return;
+                
+                // Flip the card
+                card.classList.add('flipped');
+                flippedCards.push(card);
+                
+                // Check for match if two cards are flipped
+                if (flippedCards.length === 2) {
+                    moves++;
+                    document.getElementById('moves').textContent = moves;
+                    
+                    // Check if the cards match
+                    if (flippedCards[0].dataset.emoji === flippedCards[1].dataset.emoji) {
+                        // Match found
+                        matchedPairs++;
+                        document.getElementById('matches').textContent = `${matchedPairs}/6`;
+                        document.getElementById('progress-fill').style.width = `${(matchedPairs / 6) * 100}%`;
+                        
+                        // Create confetti for matched pair
+                        createConfetti(flippedCards[0]);
+                        createConfetti(flippedCards[1]);
+                        
+                        // Reset flipped cards
+                        flippedCards = [];
+                        
+                        // Check if game is complete
+                        if (matchedPairs === 6) {
+                            setTimeout(() => {
+                                document.getElementById('final-moves').textContent = moves;
+                                document.getElementById('complete-modal').classList.remove('hidden');
+                            }, 1000);
+                        }
+                    } else {
+                        // No match
+                        canFlip = false;
+                        setTimeout(() => {
+                            flippedCards.forEach(card => card.classList.remove('flipped'));
+                            flippedCards = [];
+                            canFlip = true;
+                        }, 1000);
+                    }
+                }
+            }
+            
+            // Create confetti effect
+            function createConfetti(card) {
+                const rect = card.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                
+                const colors = ['#4f46e5', '#7c3aed', '#10b981', '#f59e0b', '#ef4444'];
+                
+                for (let i = 0; i < 20; i++) {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = `${centerX}px`;
+                    confetti.style.top = `${centerY}px`;
+                    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.animationDuration = `${Math.random() * 2 + 1}s`;
+                    confetti.style.animationDelay = `${Math.random() * 0.5}s`;
+                    
+                    document.body.appendChild(confetti);
+                    
+                    // Remove confetti after animation
+                    setTimeout(() => {
+                        confetti.remove();
+                    }, 3000);
+                }
+            }
+            
+            // Show random question
+            function showRandomQuestion() {
+                const questionCard = document.getElementById('question-card');
+                const questionText = document.getElementById('question-text');
+                
+                // Hide the card first
+                questionCard.classList.remove('show');
+                
+                // Set new question after a short delay
+                setTimeout(() => {
+                    const randomIndex = Math.floor(Math.random() * questions.length);
+                    questionText.textContent = questions[randomIndex];
+                    questionCard.classList.add('show');
+                }, 300);
+            }
+            
+            // Event listeners
+            document.getElementById('reset-btn').addEventListener('click', initGame);
+            document.getElementById('new-question-btn').addEventListener('click', showRandomQuestion);
+            document.getElementById('next-question').addEventListener('click', showRandomQuestion);
+            document.getElementById('play-again').addEventListener('click', () => {
+                document.getElementById('complete-modal').classList.add('hidden');
+                initGame();
+            });
+            
+            // Initialize the game
+            initGame();
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'961b15c5a1bb7ef2',t:'MTc1MjkzNzE5MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
